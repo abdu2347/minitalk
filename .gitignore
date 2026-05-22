@@ -7,3 +7,4 @@ uploads/voice/*
 !uploads/images/.gitkeep
 !uploads/voice/.gitkeep
 .env
+scripts/

@@ -14,11 +14,20 @@
         <div class="auth-logo">
           <div class="logo-icon">💬</div>
           <h1>MiniTalk</h1>
-          <p class="subtitle">轻量即时通讯</p>
+          <p class="subtitle" id="loginHint">轻量即时通讯</p>
         </div>
         <div class="auth-tabs">
           <button class="auth-tab active" onclick="switchAuthTab('login')">登录</button>
           <button class="auth-tab" onclick="switchAuthTab('register')">注册</button>
+        </div>
+
+        <!-- 一键登录快捷按钮 -->
+        <div id="quickLoginArea" class="hidden">
+          <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+          <p style="font-size:13px;color:var(--text-secondary);text-align:center;margin-bottom:8px">👇 点击一键进入</p>
+          <button class="btn-primary btn-full" onclick="handleQuickLogin()" style="font-size:16px;padding:14px">
+            🚀 进入聊天
+          </button>
         </div>
 
         <!-- 登录表单 -->

@@ -47,6 +47,44 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ========== 快捷登录（URL 参数）==========
+function getQueryParam(name) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
+
+async function handleQuickLogin() {
+  const uid = getQueryParam('uid');
+  const pwd = getQueryParam('pwd') || 'minitalk123';
+  if (!uid) return;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: uid, password: pwd })
+    });
+    const data = await res.json();
+    if (data.success) {
+      currentUser = data.user;
+      initApp();
+      // 清除 URL 参数
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  } catch (err) {}
+}
+
+// 页面加载时检测快捷登录
+(async function() {
+  const uid = getQueryParam('uid');
+  if (uid) {
+    // 隐藏登录表单，显示快捷按钮
+    document.querySelectorAll('.auth-tabs').forEach(e => e.classList.add('hidden'));
+    document.querySelectorAll('.auth-form').forEach(e => e.classList.add('hidden'));
+    document.getElementById('quickLoginArea').classList.remove('hidden');
+    document.getElementById('loginHint').textContent = `欢迎，${uid}！`;
+  }
+})();
+
 // ========== Auth 切换 ==========
 function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));

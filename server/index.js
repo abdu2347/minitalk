@@ -8,7 +8,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 中间件
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
 // 静态文件
@@ -19,12 +20,23 @@ app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars
 // API 路由
 app.use('/api', apiRoutes);
 
+// 快捷登录：/?uid=xxx 或 /login/xxx
+app.get('/login/:uid', async (req, res) => {
+  const { uid } = req.params;
+  const { queryOne } = require('./db');
+  const user = await queryOne('SELECT id FROM users WHERE id = ?', [uid]);
+  if (user) {
+    res.cookie('user_id', user.id, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, path: '/' });
+  }
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
 // 管理后台
 app.use('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });
 
-// 所有其他页面路由指向 index.html（需用正则避免 Express 5 '*' 报错）
+// 所有其他页面路由指向 index.html
 app.get(/^\/(?!api\/).*/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
