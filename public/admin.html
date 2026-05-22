@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniTalk 管理后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+    .login-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-card h1 { text-align: center; margin-bottom: 8px; font-size: 22px; }
+    .login-card .subtitle { text-align: center; color: #6b7280; font-size: 14px; margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px; font-weight: 500; }
+    .form-group input {
+      width: 100%; padding: 12px 14px; border: 2px solid #e8ecf1; border-radius: 8px;
+      font-size: 15px; outline: none; transition: border 0.2s;
+    }
+    .form-group input:focus { border-color: #667eea; }
+    .btn-primary {
+      width: 100%; padding: 12px; background: #667eea; color: white; border: none;
+      border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: 600; transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #5a6fd6; }
+    .error { color: #f87171; font-size: 13px; text-align: center; margin-top: 12px; min-height: 20px; }
+
+    /* 管理主界面 */
+    .admin-container { display: none; }
+    .admin-container.active { display: block; }
+    .admin-header {
+      background: #1a1a2e; color: white; padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .admin-header h1 { font-size: 20px; }
+    .admin-header .logout-btn {
+      padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; color: white; cursor: pointer; font-size: 13px;
+    }
+    .admin-header .logout-btn:hover { background: rgba(255,255,255,0.2); }
+    .admin-content { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-card .number { font-size: 32px; font-weight: 700; color: #667eea; }
+    .stat-card .label { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+    .table-card {
+      background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      overflow-x: auto;
+    }
+    .table-card h3 { font-size: 16px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 12px 8px; border-bottom: 2px solid #e8ecf1; color: #6b7280; font-weight: 600; font-size: 13px; }
+    td { padding: 12px 8px; border-bottom: 1px solid #e8ecf1; }
+    tr:hover td { background: #f8f9fb; }
+    .badge {
+      padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
+    }
+    .badge-active { background: #d1fae5; color: #065f46; }
+    .badge-disabled { background: #fee2e2; color: #991b1b; }
+    .badge-online { background: #dbeafe; color: #1e40af; }
+    .toggle-btn {
+      padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 500; transition: all 0.2s;
+    }
+    .toggle-btn.disable { background: #fee2e2; color: #991b1b; }
+    .toggle-btn.enable { background: #d1fae5; color: #065f46; }
+    .toggle-btn:hover { opacity: 0.8; }
+    .avatar-xs {
+      width: 32px; height: 32px; border-radius: 50%; object-fit: cover; vertical-align: middle;
+    }
+    .loading { text-align: center; padding: 40px; color: #6b7280; }
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 登录 -->
+  <div class="login-container" id="loginContainer">
+    <div class="login-card">
+      <h1>🔐 MiniTalk 管理</h1>
+      <p class="subtitle">请输入管理员账号密码</p>
+      <div class="form-group">
+        <label>管理员账号</label>
+        <input type="text" id="adminUsername" value="admin" placeholder="admin">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="adminPassword" placeholder="输入密码" onkeydown="if(event.key==='Enter') handleAdminLogin()">
+      </div>
+      <button class="btn-primary" onclick="handleAdminLogin()">登 录</button>
+      <p class="error" id="adminError"></p>
+    </div>
+  </div>
+
+  <!-- 管理界面 -->
+  <div class="admin-container" id="adminContainer">
+    <div class="admin-header">
+      <h1>🔐 MiniTalk 管理后台</h1>
+      <div>
+        <span id="refreshTime" style="font-size:13px;opacity:0.7;margin-right:12px"></span>
+        <button class="logout-btn" onclick="handleAdminLogout()">退出登录</button>
+      </div>
+    </div>
+    <div class="admin-content">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="number" id="statTotal">-</div><div class="label">总用户</div></div>
+        <div class="stat-card"><div class="number" id="statOnline">-</div><div class="label">在线</div></div>
+        <div class="stat-card"><div class="number" id="statActive">-</div><div class="label">活跃用户</div></div>
+        <div class="stat-card"><div class="number" id="statDisabled">-</div><div class="label">已禁用</div></div>
+      </div>
+
+      <div class="table-card">
+        <h3>📋 用户管理</h3>
+        <div id="userTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function handleAdminLogin() {
+      const username = document.getElementById('adminUsername').value.trim();
+      const password = document.getElementById('adminPassword').value.trim();
+      const errorEl = document.getElementById('adminError');
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('loginContainer').style.display = 'none';
+          document.getElementById('adminContainer').classList.add('active');
+          loadAdminData();
+          setInterval(loadAdminData, 30000); // 每30秒刷新
+        } else {
+          errorEl.textContent = data.error;
+        }
+      } catch (err) {
+        errorEl.textContent = '网络错误';
+      }
+    }
+
+    async function loadAdminData() {
+      try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        const users = data.users || [];
+        renderStats(users);
+        renderUserTable(users);
+        document.getElementById('refreshTime').textContent = new Date().toLocaleString('zh-CN');
+      } catch (err) {}
+    }
+
+    function renderStats(users) {
+      const total = users.length;
+      const online = users.filter(u => u.isOnline).length;
+      const active = users.filter(u => new Date(u.last_active_at) > new Date(Date.now() - 86400000)).length;
+      const disabled = users.filter(u => !u.is_active).length;
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statOnline').textContent = online;
+      document.getElementById('statActive').textContent = active;
+      document.getElementById('statDisabled').textContent = disabled;
+    }
+
+    function renderUserTable(users) {
+      const container = document.getElementById('userTable');
+      if (users.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px">暂无用户</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>头像</th>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>昵称</th>
+              <th>状态</th>
+              <th>好友数</th>
+              <th>群数</th>
+              <th>消息数</th>
+              <th>登录次数</th>
+              <th>最后活跃</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td><img src="${u.avatar || '/avatars/default.svg'}" class="avatar-xs" onerror="this.src='/avatars/default.svg'"></td>
+                <td style="font-family:monospace;font-size:13px">${u.id}</td>
+                <td>${escapeHtml(u.username)}</td>
+                <td>${escapeHtml(u.nickname)}</td>
+                <td>
+                  ${u.isOnline ? '<span class="badge badge-online">在线</span>' : ''}
+                  ${u.is_active ? '<span class="badge badge-active">正常</span>' : '<span class="badge badge-disabled">已禁用</span>'}
+                </td>
+                <td>${u.friendCount}</td>
+                <td>${u.groupCount}</td>
+                <td>${u.msgCount}</td>
+                <td>${u.login_count}</td>
+                <td style="font-size:12px">${formatDate(u.last_active_at)}</td>
+                <td>
+                  <button class="toggle-btn ${u.is_active ? 'disable' : 'enable'}" onclick="toggleUser('${u.id}', ${u.is_active})">
+                    ${u.is_active ? '禁用' : '启用'}
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function toggleUser(userId, currentlyActive) {
+      if (!confirm(`确定${currentlyActive ? '禁用' : '启用'}此用户？`)) return;
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/toggle`, { method: 'PUT' });
+        const data = await res.json();
+        if (data.success) {
+          loadAdminData();
+        }
+      } catch (err) {
+        alert('操作失败');
+      }
+    }
+
+    function handleAdminLogout() {
+      document.cookie = 'admin_id=; max-age=0; path=/';
+      document.getElementById('adminContainer').classList.remove('active');
+      document.getElementById('loginContainer').style.display = 'flex';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 1000);
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff/60) + '分钟前';
+      if (diff < 86400) return Math.floor(diff/3600) + '小时前';
+      return d.toLocaleDateString('zh-CN');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniTalk - 迷你聊天</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- ========== 登录页 ========== -->
+  <div id="loginPage" class="page active">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="logo-icon">💬</div>
+          <h1>MiniTalk</h1>
+          <p class="subtitle">轻量即时通讯</p>
+        </div>
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="switchAuthTab('login')">登录</button>
+          <button class="auth-tab" onclick="switchAuthTab('register')">注册</button>
+        </div>
+
+        <!-- 登录表单 -->
+        <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="loginUsername" placeholder="输入用户名" required>
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="loginPassword" placeholder="输入密码" required>
+          </div>
+          <button type="submit" class="btn-primary btn-full">登 录</button>
+          <p class="auth-error" id="loginError"></p>
+        </form>
+
+        <!-- 注册表单 -->
+        <form id="registerForm" class="auth-form" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="regUsername" placeholder="登录用的用户名" required>
+          </div>
+          <div class="form-group">
+            <label>昵称</label>
+            <input type="text" id="regNickname" placeholder="别人看到的名称" required>
+          </div>
+          <div class="form-group">
+            <label>自定义 ID（可选）</label>
+            <input type="text" id="regId" placeholder="留空自动生成，用于搜索加好友">
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="regPassword" placeholder="至少6位密码" minlength="6" required>
+          </div>
+          <button type="submit" class="btn-primary btn-full">注 册</button>
+          <p class="auth-error" id="regError"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 主界面 ========== -->
+  <div id="mainPage" class="page">
+    <div class="app-container">
+      <!-- 左侧边栏 -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="current-user" onclick="showUserProfile()">
+            <img id="myAvatar" src="" alt="avatar" class="avatar-sm">
+            <span id="myNickname"></span>
+          </div>
+          <div class="sidebar-actions">
+            <button class="icon-btn" onclick="showAddFriend()" title="添加好友">👥</button>
+            <button class="icon-btn" onclick="showCreateGroup()" title="创建群组">➕</button>
+          </div>
+        </div>
+
+        <!-- 搜索栏 -->
+        <div class="search-bar">
+          <input type="text" id="searchChat" placeholder="搜索聊天..." oninput="filterChats(this.value)">
+        </div>
+
+        <!-- 聊天列表 -->
+        <div class="chat-list" id="chatList"></div>
+
+        <!-- 底部用户菜单 -->
+        <div class="sidebar-footer">
+          <button class="footer-btn" onclick="handleLogout()">🚪 退出</button>
+        </div>
+      </div>
+
+      <!-- 右侧聊天区域 -->
+      <div class="chat-main">
+        <!-- 无聊天选择时 -->
+        <div id="emptyChat" class="empty-chat">
+          <div class="empty-icon">💬</div>
+          <h2>MiniTalk</h2>
+          <p>选择一个好友或群组开始聊天</p>
+        </div>
+
+        <!-- 聊天界面 -->
+        <div id="chatView" class="chat-view hidden">
+          <div class="chat-header" id="chatHeader">
+            <img id="chatAvatar" src="" alt="" class="avatar-sm">
+            <div class="chat-header-info">
+              <span id="chatTitle"></span>
+              <span id="chatSubtitle" class="chat-subtitle"></span>
+            </div>
+            <button class="icon-btn ml-auto" id="chatInfoBtn" onclick="showChatInfo()" title="聊天信息">ℹ️</button>
+          </div>
+
+          <div class="messages" id="messages"></div>
+
+          <div class="typing-indicator" id="typingIndicator"></div>
+
+          <div class="message-input-area">
+            <div class="input-toolbar">
+              <button class="tool-btn" onclick="openEmojiPicker()" title="表情">😊</button>
+              <button class="tool-btn" onclick="document.getElementById('imageInput').click()" title="图片">🖼️</button>
+              <button class="tool-btn" onclick="toggleVoiceRecord()" title="语音" id="voiceBtn">🎤</button>
+              <input type="file" id="imageInput" accept="image/*" hidden onchange="sendImage(event)">
+            </div>
+            <div class="input-row">
+              <textarea id="messageInput" rows="1" placeholder="输入消息..." onkeydown="handleInputKeydown(event)" oninput="autoResize(this)"></textarea>
+              <button class="btn-send" onclick="sendMessage()">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 模态框 ========== -->
+  <div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+    <div class="modal" id="activeModal" onclick="event.stopPropagation()"></div>
+  </div>
+
+  <!-- 表情面板 -->
+  <div id="emojiPicker" class="emoji-picker hidden">
+    <div class="emoji-grid" id="emojiGrid"></div>
+  </div>
+
+  <!-- 语音录制 -->
+  <div id="voiceRecordModal" class="modal-overlay hidden" onclick="closeVoiceRecord(event)">
+    <div class="modal voice-modal" onclick="event.stopPropagation()">
+      <h3>录制语音</h3>
+      <div class="voice-recorder">
+        <div class="voice-wave" id="voiceWave"></div>
+        <div class="voice-timer" id="voiceTimer">00:00</div>
+        <div class="voice-actions">
+          <button class="btn-record" id="recordBtn" onclick="startRecording()">🔴 开始录制</button>
+          <button class="btn-record" id="stopBtn" onclick="stopRecording()" disabled>⏹️ 停止</button>
+          <button class="btn-record" id="sendVoiceBtn" onclick="sendVoiceRecording()" disabled>📤 发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
