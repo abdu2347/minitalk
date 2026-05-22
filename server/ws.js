@@ -1,7 +1,6 @@
 const WebSocket = require('ws');
-const db = require('./db');
+const { query, queryOne, run } = require('./db');
 
-// 存储在线用户：userId -> { ws, userInfo }
 const onlineUsers = new Map();
 
 function setupWebSocket(server) {
@@ -10,7 +9,7 @@ function setupWebSocket(server) {
   wss.on('connection', (ws, req) => {
     let userId = null;
 
-    ws.on('message', (raw) => {
+    ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw);
         const { type, payload } = msg;
@@ -18,14 +17,11 @@ function setupWebSocket(server) {
         switch (type) {
           case 'auth': {
             userId = payload.userId;
-            const user = db.prepare('SELECT id, username, nickname, avatar, bio FROM users WHERE id = ?').get(userId);
+            const user = await queryOne('SELECT id, username, nickname, avatar, bio FROM users WHERE id = ?', [userId]);
             if (user) {
               onlineUsers.set(userId, { ws, userInfo: user });
-              // 更新最后活跃时间
-              db.prepare('UPDATE users SET last_active_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(userId);
-              // 广播在线状态
+              await run('UPDATE users SET last_active_at = datetime(\'now\', \'localtime\') WHERE id = ?', [userId]);
               broadcastOnlineUsers();
-              // 通知好友上线
               notifyFriendsOnline(userId);
             }
             break;
@@ -33,17 +29,20 @@ function setupWebSocket(server) {
 
           case 'message': {
             const { toId, groupId, type: msgType, content, filePath } = payload;
-            // 保存消息到数据库
-            const stmt = db.prepare(
-              'INSERT INTO messages (from_id, to_id, group_id, type, content, file_path) VALUES (?, ?, ?, ?, ?, ?)'
+            const result = await run(
+              'INSERT INTO messages (from_id, to_id, group_id, type, content, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+              [userId, toId || null, groupId || null, msgType || 'text', content || null, filePath || null]
             );
-            const result = stmt.run(userId, toId || null, groupId || null, msgType || 'text', content || null, filePath || null);
             const messageId = result.lastInsertRowid;
 
-            // 构造消息对象
+            // 获取发送者信息
+            const sender = await queryOne('SELECT nickname, avatar FROM users WHERE id = ?', [userId]);
+
             const msgObj = {
               id: messageId,
               from_id: userId,
+              from_nickname: sender?.nickname || '',
+              from_avatar: sender?.avatar || '',
               to_id: toId || null,
               group_id: groupId || null,
               type: msgType || 'text',
@@ -53,8 +52,7 @@ function setupWebSocket(server) {
             };
 
             if (groupId) {
-              // 发送到群组所有成员
-              const members = db.prepare('SELECT user_id FROM group_members WHERE group_id = ?').all(groupId);
+              const members = await query('SELECT user_id FROM group_members WHERE group_id = ?', [groupId]);
               members.forEach(m => {
                 const peer = onlineUsers.get(m.user_id);
                 if (peer && peer.ws.readyState === WebSocket.OPEN) {
@@ -62,12 +60,10 @@ function setupWebSocket(server) {
                 }
               });
             } else if (toId) {
-              // 发送私聊
               const peer = onlineUsers.get(toId);
               if (peer && peer.ws.readyState === WebSocket.OPEN) {
                 peer.ws.send(JSON.stringify({ type: 'message', payload: msgObj }));
               }
-              // 也发给发送者自己
               if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'message', payload: msgObj }));
               }
@@ -84,7 +80,7 @@ function setupWebSocket(server) {
               }
             }
             if (groupId) {
-              const members = db.prepare('SELECT user_id FROM group_members WHERE group_id = ?').all(groupId);
+              const members = await query('SELECT user_id FROM group_members WHERE group_id = ?', [groupId]);
               members.forEach(m => {
                 if (m.user_id !== userId) {
                   const peer = onlineUsers.get(m.user_id);
@@ -101,7 +97,7 @@ function setupWebSocket(server) {
             const { toId } = payload;
             const peer = onlineUsers.get(toId);
             if (peer && peer.ws.readyState === WebSocket.OPEN) {
-              const fromUser = db.prepare('SELECT id, nickname, avatar FROM users WHERE id = ?').get(userId);
+              const fromUser = await queryOne('SELECT id, nickname, avatar FROM users WHERE id = ?', [userId]);
               peer.ws.send(JSON.stringify({ type: 'friend_request', payload: fromUser }));
             }
             break;
@@ -117,7 +113,7 @@ function setupWebSocket(server) {
           }
         }
       } catch (e) {
-        // ignore parse errors
+        // ignore parse errors and db errors
       }
     });
 
@@ -140,29 +136,20 @@ function setupWebSocket(server) {
     const users = Array.from(onlineUsers.values()).map(u => u.userInfo);
     const msg = JSON.stringify({ type: 'online_users', payload: users });
     onlineUsers.forEach(({ ws }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
-      }
+      if (ws.readyState === WebSocket.OPEN) ws.send(msg);
     });
   }
 
-  function notifyFriendsOnline(userId) {
-    const friends = db.prepare(`
-      SELECT u.id, u.nickname, u.avatar FROM friends f
-      JOIN users u ON u.id = f.friend_id
-      WHERE f.user_id = ?
-    `).all(userId);
-    // 通知好友该用户上线
+  async function notifyFriendsOnline(userId) {
+    const friends = await query(
+      'SELECT u.id FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?', [userId]);
     const msg = JSON.stringify({ type: 'friend_online', payload: { userId } });
     friends.forEach(f => {
       const peer = onlineUsers.get(f.id);
-      if (peer && peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(msg);
-      }
+      if (peer && peer.ws.readyState === WebSocket.OPEN) peer.ws.send(msg);
     });
   }
 
-  // 获取在线用户列表（给 REST API 用）
   global.getOnlineUsers = () => Array.from(onlineUsers.keys());
 }
 
